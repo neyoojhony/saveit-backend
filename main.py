@@ -48,13 +48,17 @@ def get_media_info(req: URLRequest):
     platform = detect_platform(url)
 
     if platform == "unknown":
-        raise HTTPException(status_code=400, detail="Unsupported URL. Only Instagram, YouTube, Facebook supported.")
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported URL. Only Instagram, YouTube, Facebook supported."
+        )
 
     cookies = get_cookies_path()
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
+        "noplaylist": True,
     }
     if cookies:
         ydl_opts["cookiefile"] = cookies
@@ -71,9 +75,9 @@ def get_media_info(req: URLRequest):
                 height = f.get("height")
                 ext = f.get("ext", "mp4")
                 has_video = f.get("vcodec", "none") != "none"
-                has_audio = f.get("acodec", "none") != "none"
 
-                if has_video and has_audio and height:
+                # Sirf video hona enough hai; YouTube me audio alag stream me hoti hai
+                if has_video and height:
                     label = f"{height}p {ext.upper()}"
                     if label not in seen:
                         seen.add(label)
@@ -85,17 +89,27 @@ def get_media_info(req: URLRequest):
                             "filesize": f.get("filesize"),
                         })
 
+            # Audio option
             formats.append({
                 "format_id": "bestaudio/best",
-                "label": "Audio Only (MP3)",
+                "label": "Audio Only",
                 "height": 0,
-                "ext": "mp3",
+                "ext": "m4a",
                 "filesize": None,
             })
+
             formats = sorted(formats, key=lambda x: x["height"], reverse=True)
 
         if not formats:
-            formats = [{"format_id": "best", "label": "Best Quality", "height": 0, "ext": "mp4", "filesize": None}]
+            formats = [
+                {
+                    "format_id": "best",
+                    "label": "Best Quality",
+                    "height": 0,
+                    "ext": "mp4",
+                    "filesize": None,
+                }
+            ]
 
         return {
             "platform": platform,
@@ -110,10 +124,11 @@ def get_media_info(req: URLRequest):
         error_msg = str(e)
         if "Private" in error_msg or "login" in error_msg.lower():
             raise HTTPException(status_code=403, detail="Private content — login required.")
+        if "confirm you’re not a bot" in error_msg.lower() or "confirm you're not a bot" in error_msg.lower():
+            raise HTTPException(status_code=403, detail="YouTube is asking for login/cookies verification.")
         raise HTTPException(status_code=422, detail=f"Could not fetch media: {error_msg[:200]}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)[:200])
-
 
 @app.get("/download")
 def download_media(url: str, format_id: str = "best"):
@@ -123,16 +138,20 @@ def download_media(url: str, format_id: str = "best"):
     if platform == "unknown":
         raise HTTPException(status_code=400, detail="Unsupported URL.")
 
-    if format_id == "bestaudio/best" or format_id == "audio":
+    # Safer format handling
+    if format_id in ("bestaudio/best", "audio"):
         ydl_fmt = "bestaudio/best"
+    elif format_id == "best":
+        ydl_fmt = "bestvideo*+bestaudio/best"
     else:
-        ydl_fmt = f"{format_id}+bestaudio/{format_id}/best"
+        ydl_fmt = f"{format_id}+bestaudio/best/{format_id}/best"
 
     cookies = get_cookies_path()
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
+        "noplaylist": True,
         "format": ydl_fmt,
     }
     if cookies:
@@ -142,7 +161,19 @@ def download_media(url: str, format_id: str = "best"):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
-        direct_url = info.get("url") or (info.get("formats", [{}])[-1].get("url"))
+        direct_url = info.get("url")
+
+        if not direct_url and info.get("requested_formats"):
+            for f in info["requested_formats"]:
+                if f.get("url"):
+                    direct_url = f["url"]
+                    break
+
+        if not direct_url and info.get("formats"):
+            for f in reversed(info["formats"]):
+                if f.get("url"):
+                    direct_url = f["url"]
+                    break
 
         if not direct_url:
             raise HTTPException(status_code=404, detail="Could not get download URL.")
@@ -155,6 +186,9 @@ def download_media(url: str, format_id: str = "best"):
         }
 
     except yt_dlp.utils.DownloadError as e:
-        raise HTTPException(status_code=422, detail=str(e)[:200])
+        error_msg = str(e)
+        if "confirm you’re not a bot" in error_msg.lower() or "confirm you're not a bot" in error_msg.lower():
+            raise HTTPException(status_code=403, detail="YouTube is asking for login/cookies verification.")
+        raise HTTPException(status_code=422, detail=error_msg[:200])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)[:200])
