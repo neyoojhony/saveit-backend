@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SaveIt — Social Media Downloader</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c14;
+    --surface: #0f1520;
+    --surface2: #161e2e;
+    --border: rgba(255,255,255,0.07);
+    --accent-ig: #e1306c;
+    --accent-yt: #ff0000;
+    --accent-fb: #1877f2;
+    --accent-glow: #e1306c;
+    --text: #f0f4ff;
+    --muted: #6b7a99;
+    --white: #ffffff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* BG Effect */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -30%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 600px;
+    background: radial-gradient(ellipse, rgba(225,48,108,0.12) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* NAV */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 48px;
+    position: relative;
+    z-index: 10;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    background: rgba(8,12,20,0.8);
+    position: sticky;
+    top: 0;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.5rem;
+    letter-spacing: -0.5px;
+  }
+
+  .logo span {
+    background: linear-gradient(135deg, #e1306c, #f77737);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 8px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 20px;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .nav-links a:hover, .nav-links a.active {
+    color: var(--white);
+    background: var(--surface2);
+  }
+
+  /* HERO */
+  .hero {
+    text-align: center;
+    padding: 80px 24px 60px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(225,48,108,0.1);
+    border: 1px solid rgba(225,48,108,0.25);
+    color: #e1306c;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+
+  .badge::before { content: '✦'; font-size: 10px; }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2.4rem, 6vw, 4.2rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -2px;
+    margin-bottom: 16px;
+  }
+
+  h1 .highlight {
+    background: linear-gradient(135deg, #e1306c 0%, #f77737 50%, #fcaf45 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    font-size: 1.05rem;
+    color: var(--muted);
+    max-width: 480px;
+    margin: 0 auto 48px;
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  /* PLATFORM TABS */
+  .platform-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    padding: 0 16px;
+  }
+
+  .platform-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.25s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .platform-tab:hover {
+    border-color: rgba(255,255,255,0.15);
+    color: var(--white);
+    transform: translateY(-1px);
+  }
+
+  .platform-tab.active-ig {
+    background: rgba(225,48,108,0.12);
+    border-color: rgba(225,48,108,0.4);
+    color: #e1306c;
+  }
+
+  .platform-tab.active-yt {
+    background: rgba(255,0,0,0.1);
+    border-color: rgba(255,0,0,0.4);
+    color: #ff4444;
+  }
+
+  .platform-tab.active-fb {
+    background: rgba(24,119,242,0.1);
+    border-color: rgba(24,119,242,0.4);
+    color: #4d9cf5;
+  }
+
+  .platform-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+  }
+
+  /* DOWNLOAD BOX */
+  .download-box {
+    max-width: 680px;
+    margin: 0 auto 48px;
+    padding: 0 16px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .input-wrapper {
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 6px 6px 6px 20px;
+    transition: all 0.3s;
+    gap: 8px;
+  }
+
+  .input-wrapper:focus-within {
+    border-color: rgba(225,48,108,0.5);
+    box-shadow: 0 0 0 4px rgba(225,48,108,0.08);
+  }
+
+  .input-wrapper input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    font-size: 0.95rem;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    padding: 12px 0;
+  }
+
+  .input-wrapper input::placeholder { color: var(--muted); }
+
+  .btn-paste {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+    white-space: nowrap;
+  }
+
+  .btn-paste:hover { color: var(--white); }
+
+  .btn-download {
+    background: linear-gradient(135deg, #e1306c, #f77737);
+    border: none;
+    color: white;
+    padding: 13px 28px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s;
+    font-family: 'DM Sans', sans-serif;
+    white-space: nowrap;
+    box-shadow: 0 4px 20px rgba(225,48,108,0.35);
+  }
+
+  .btn-download:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 28px rgba(225,48,108,0.5);
+  }
+
+  .btn-download.yt-btn {
+    background: linear-gradient(135deg, #cc0000, #ff4444);
+    box-shadow: 0 4px 20px rgba(255,0,0,0.3);
+  }
+
+  .btn-download.fb-btn {
+    background: linear-gradient(135deg, #0f65d4, #4d9cf5);
+    box-shadow: 0 4px 20px rgba(24,119,242,0.3);
+  }
+
+  /* SUB TABS (Instagram) */
+  .sub-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    padding: 0 16px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .sub-tab {
+    padding: 7px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .sub-tab:hover, .sub-tab.active {
+    border-color: rgba(225,48,108,0.4);
+    color: #e1306c;
+    background: rgba(225,48,108,0.08);
+  }
+
+  /* RESULT AREA */
+  .result-area {
+    max-width: 680px;
+    margin: 0 auto 60px;
+    padding: 0 16px;
+    display: none;
+    animation: fadeUp 0.4s ease;
+  }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .result-thumb {
+    width: 80px;
+    height: 80px;
+    border-radius: 10px;
+    background: var(--surface2);
+    flex-shrink: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+  }
+
+  .result-info { flex: 1; min-width: 0; }
+  .result-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .result-meta { color: var(--muted); font-size: 0.8rem; margin-bottom: 12px; }
+
+  .quality-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .q-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .q-btn:hover {
+    background: linear-gradient(135deg, #e1306c, #f77737);
+    border-color: transparent;
+    color: white;
+  }
+
+  /* LOADING */
+  .loading {
+    display: none;
+    text-align: center;
+    padding: 32px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 2.5px solid var(--border);
+    border-top-color: #e1306c;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+
+  /* FEATURES */
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    max-width: 960px;
+    margin: 0 auto 80px;
+    padding: 0 24px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    transition: all 0.25s;
+  }
+
+  .feature-card:hover {
+    border-color: rgba(255,255,255,0.12);
+    transform: translateY(-2px);
+  }
+
+  .feature-icon {
+    font-size: 1.6rem;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .feature-card h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .feature-card p {
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+
+  /* HOW TO */
+  .how-section {
+    max-width: 900px;
+    margin: 0 auto 80px;
+    padding: 0 24px;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+
+  .section-sub {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 40px;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+  }
+
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 20px;
+  }
+
+  .step-num {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #e1306c, #f77737);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1rem;
+    margin: 0 auto 16px;
+  }
+
+  .step h4 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+  }
+
+  .step p { color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
+
+  /* STATS */
+  .stats {
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    flex-wrap: wrap;
+    padding: 48px 24px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 80px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .stat { text-align: center; }
+  .stat-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #e1306c, #f77737);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: block;
+  }
+  .stat-label { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 32px 24px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+    position: relative;
+    z-index: 2;
+  }
+
+  footer a { color: var(--muted); text-decoration: none; margin: 0 12px; }
+  footer a:hover { color: var(--text); }
+
+  /* PLATFORM PANELS */
+  .platform-panel { display: none; }
+  .platform-panel.active { display: block; }
+
+  /* ANIMATIONS */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .hero { animation: fadeUp 0.6s ease both; }
+  .platform-tabs { animation: fadeUp 0.6s ease 0.1s both; }
+  .download-box { animation: fadeUp 0.6s ease 0.2s both; }
+
+  /* MOBILE */
+  @media (max-width: 600px) {
+    nav { padding: 16px 20px; }
+    .nav-links { display: none; }
+    h1 { letter-spacing: -1px; }
+    .input-wrapper { flex-wrap: wrap; }
+    .btn-paste { display: none; }
+    .stats { gap: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">Save<span>It</span></div>
+  <ul class="nav-links">
+    <li><a href="#" onclick="scrollToTop()">Home</a></li>
+    <li><a href="#how">How to Use</a></li>
+    <li><a href="#features">Features</a></li>
+  </ul>
+</nav>
+
+<section class="hero">
+  <div class="badge">Free · No Login · No Watermark</div>
+  <h1>Download From<br><span class="highlight">Anywhere, Anytime</span></h1>
+  <p class="subtitle">Save videos, photos, reels, stories and more from Instagram, YouTube & Facebook — instantly.</p>
+</section>
+
+<!-- PLATFORM TABS -->
+<div class="platform-tabs">
+  <button class="platform-tab active-ig" onclick="switchPlatform('ig', this)">
+    <span class="platform-icon">📸</span> Instagram
+  </button>
+  <button class="platform-tab" onclick="switchPlatform('yt', this)">
+    <span class="platform-icon">▶️</span> YouTube
+  </button>
+  <button class="platform-tab" onclick="switchPlatform('fb', this)">
+    <span class="platform-icon">👤</span> Facebook
+  </button>
+</div>
+
+<!-- INSTAGRAM PANEL -->
+<div id="panel-ig" class="platform-panel active">
+  <div class="sub-tabs">
+    <button class="sub-tab active" onclick="setSubTab(this, 'video')">🎬 Video</button>
+    <button class="sub-tab" onclick="setSubTab(this, 'photo')">🖼 Photo</button>
+    <button class="sub-tab" onclick="setSubTab(this, 'reels')">🎵 Reels</button>
+    <button class="sub-tab" onclick="setSubTab(this, 'story')">⭕ Story</button>
+    <button class="sub-tab" onclick="setSubTab(this, 'igtv')">📺 IGTV</button>
+    <button class="sub-tab" onclick="setSubTab(this, 'carousel')">🎠 Carousel</button>
+    <button class="sub-tab" onclick="setSubTab(this, 'viewer')">👁 Viewer</button>
+  </div>
+  <div class="download-box">
+    <div class="input-wrapper">
+      <input type="text" id="ig-url" placeholder="Paste Instagram link here..." />
+      <button class="btn-paste" onclick="pasteURL('ig-url')">📋 Paste</button>
+      <button class="btn-download" onclick="startDownload('ig')">Download</button>
+    </div>
+  </div>
+</div>
+
+<!-- YOUTUBE PANEL -->
+<div id="panel-yt" class="platform-panel">
+  <div class="download-box">
+    <div class="input-wrapper">
+      <input type="text" id="yt-url" placeholder="Paste YouTube video link here..." />
+      <button class="btn-paste" onclick="pasteURL('yt-url')">📋 Paste</button>
+      <button class="btn-download yt-btn" onclick="startDownload('yt')">Download</button>
+    </div>
+  </div>
+</div>
+
+<!-- FACEBOOK PANEL -->
+<div id="panel-fb" class="platform-panel">
+  <div class="download-box">
+    <div class="input-wrapper">
+      <input type="text" id="fb-url" placeholder="Paste Facebook video link here..." />
+      <button class="btn-paste" onclick="pasteURL('fb-url')">📋 Paste</button>
+      <button class="btn-download fb-btn" onclick="startDownload('fb')">Download</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  Fetching media info...
+</div>
+
+<!-- RESULT -->
+<div class="result-area" id="result-area">
+  <div class="result-card">
+    <div class="result-thumb" id="result-thumb">🎬</div>
+    <div class="result-info">
+      <div class="result-title" id="result-title">Loading...</div>
+      <div class="result-meta" id="result-meta">Processing...</div>
+      <div class="quality-btns" id="quality-btns"></div>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats">
+  <div class="stat">
+    <span class="stat-num">50M+</span>
+    <div class="stat-label">Downloads Done</div>
+  </div>
+  <div class="stat">
+    <span class="stat-num">3</span>
+    <div class="stat-label">Platforms Supported</div>
+  </div>
+  <div class="stat">
+    <span class="stat-num">100%</span>
+    <div class="stat-label">Free Forever</div>
+  </div>
+  <div class="stat">
+    <span class="stat-num">0</span>
+    <div class="stat-label">Login Required</div>
+  </div>
+</div>
+
+<!-- HOW TO USE -->
+<div class="how-section" id="how">
+  <div class="section-title">How to Use</div>
+  <div class="section-sub">3 simple steps — done in seconds</div>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h4>Copy the Link</h4>
+      <p>Open Instagram, YouTube or Facebook and copy the link of the post, video or reel you want to save.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h4>Paste & Click</h4>
+      <p>Paste the link in the input box above and click the Download button. We'll fetch it instantly.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h4>Choose Quality & Save</h4>
+      <p>Pick your preferred quality — HD, SD or Original. The file downloads straight to your device.</p>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<div class="features" id="features">
+  <div class="feature-card">
+    <span class="feature-icon">⚡</span>
+    <h3>Blazing Fast</h3>
+    <p>Optimized servers deliver your files at maximum speed with no waiting.</p>
+  </div>
+  <div class="feature-card">
+    <span class="feature-icon">🔒</span>
+    <h3>100% Private</h3>
+    <p>No login, no tracking, no cookies. Your links are never stored on our servers.</p>
+  </div>
+  <div class="feature-card">
+    <span class="feature-icon">📱</span>
+    <h3>All Devices</h3>
+    <p>Works perfectly on mobile, tablet and desktop. Any browser, any OS.</p>
+  </div>
+  <div class="feature-card">
+    <span class="feature-icon">🎯</span>
+    <h3>Original Quality</h3>
+    <p>Download in original resolution. No compression, no watermarks added.</p>
+  </div>
+  <div class="feature-card">
+    <span class="feature-icon">🎠</span>
+    <h3>Carousel Support</h3>
+    <p>Download all photos and videos from Instagram album posts in one click.</p>
+  </div>
+  <div class="feature-card">
+    <span class="feature-icon">👁</span>
+    <h3>Anonymous Viewer</h3>
+    <p>View Instagram stories and profiles without them knowing you visited.</p>
+  </div>
+</div>
+
+<footer>
+  <p style="margin-bottom:12px">
+    <a href="#">Privacy Policy</a>
+    <a href="#">Terms</a>
+    <a href="#">Contact</a>
+    <a href="#">FAQ</a>
+  </p>
+  <p>© 2026 SaveIt. All rights reserved. For personal use only.</p>
+</footer>
+
+<script>
+  let currentPlatform = 'ig';
+  let currentSubTab = 'video';
+
+  function switchPlatform(platform, btn) {
+    currentPlatform = platform;
+
+    // Hide all panels
+    document.querySelectorAll('.platform-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + platform).classList.add('active');
+
+    // Update tab styles
+    document.querySelectorAll('.platform-tab').forEach(t => {
+      t.className = 'platform-tab';
+    });
+    btn.classList.add('active-' + platform);
+
+    // Hide results
+    hideResult();
+  }
+
+  function setSubTab(btn, type) {
+    currentSubTab = type;
+    document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    hideResult();
+
+    // Update placeholder
+    const input = document.getElementById('ig-url');
+    const placeholders = {
+      video: 'Paste Instagram video link...',
+      photo: 'Paste Instagram photo link...',
+      reels: 'Paste Instagram Reels link...',
+      story: 'Enter Instagram username to view stories...',
+      igtv: 'Paste Instagram IGTV link...',
+      carousel: 'Paste Instagram carousel/album link...',
+      viewer: 'Enter Instagram username to view anonymously...'
+    };
+    input.placeholder = placeholders[type] || 'Paste Instagram link here...';
+  }
+
+  async function pasteURL(inputId) {
+    try {
+      const text = await navigator.clipboard.readText();
+      document.getElementById(inputId).value = text;
+    } catch {
+      document.getElementById(inputId).focus();
+    }
+  }
+
+  function hideResult() {
+    document.getElementById('result-area').style.display = 'none';
+    document.getElementById('loading').style.display = 'none';
+  }
+
+  async function startDownload(platform) {
+    const inputMap = { ig: 'ig-url', yt: 'yt-url', fb: 'fb-url' };
+    const url = document.getElementById(inputMap[platform]).value.trim();
+
+    if (!url) {
+      shakeInput(inputMap[platform]);
+      return;
+    }
+
+    // ⚙️ Render pe deploy karne ke baad apna URL yahan daalo
+    const API_BASE = "https://saveit-backend.onrender.com";
+
+    hideResult();
+    document.getElementById('loading').style.display = 'block';
+
+    try {
+      const res = await fetch(`${API_BASE}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || 'Something went wrong');
+      }
+
+      document.getElementById('loading').style.display = 'none';
+      showResult(data, url, API_BASE);
+
+    } catch (err) {
+      document.getElementById('loading').style.display = 'none';
+      showError(err.message);
+    }
+  }
+
+  function showResult(data, originalUrl, API_BASE) {
+    const icons = { instagram: '📸', youtube: '▶️', facebook: '👤' };
+    const thumb = document.getElementById('result-thumb');
+
+    if (data.thumbnail) {
+      thumb.innerHTML = `<img src="${data.thumbnail}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='${icons[data.platform] || '🎬'}'">`;
+    } else {
+      thumb.textContent = icons[data.platform] || '🎬';
+    }
+
+    document.getElementById('result-title').textContent = data.title || 'Media';
+    document.getElementById('result-meta').textContent =
+      `${data.platform.charAt(0).toUpperCase() + data.platform.slice(1)}` +
+      (data.uploader ? ` · @${data.uploader}` : '') +
+      (data.duration ? ` · ${Math.floor(data.duration/60)}:${String(data.duration%60).padStart(2,'0')}` : '');
+
+    const btns = document.getElementById('quality-btns');
+    btns.innerHTML = '';
+
+    (data.formats || []).forEach(f => {
+      const btn = document.createElement('button');
+      btn.className = 'q-btn';
+      btn.textContent = `⬇ ${f.label}`;
+      btn.onclick = async () => {
+        btn.textContent = '⏳ Getting link...';
+        btn.disabled = true;
+        try {
+          const dlRes = await fetch(`${API_BASE}/download?url=${encodeURIComponent(originalUrl)}&format_id=${encodeURIComponent(f.format_id)}`);
+          const dlData = await dlRes.json();
+          if (dlData.download_url) {
+            const a = document.createElement('a');
+            a.href = dlData.download_url;
+            a.download = `${dlData.title || 'media'}.${dlData.ext || 'mp4'}`;
+            a.target = '_blank';
+            a.click();
+            btn.textContent = `✓ ${f.label}`;
+          } else {
+            throw new Error('No download URL');
+          }
+        } catch {
+          btn.textContent = '❌ Failed — Try Again';
+        }
+        setTimeout(() => { btn.textContent = `⬇ ${f.label}`; btn.disabled = false; }, 3000);
+      };
+      btns.appendChild(btn);
+    });
+
+    document.getElementById('result-area').style.display = 'block';
+    document.getElementById('result-area').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function showError(msg) {
+    const area = document.getElementById('result-area');
+    area.innerHTML = `
+      <div class="result-card" style="border-color:rgba(225,48,108,0.3);background:rgba(225,48,108,0.05)">
+        <div style="font-size:2rem">❌</div>
+        <div>
+          <div style="font-weight:600;margin-bottom:6px;color:#e1306c">Download Failed</div>
+          <div style="color:var(--muted);font-size:0.85rem">${msg}</div>
+        </div>
+      </div>`;
+    area.style.display = 'block';
+  }
+
+  function shakeInput(inputId) {
+    const input = document.getElementById(inputId).parentElement;
+    input.style.animation = 'none';
+    input.style.borderColor = '#e1306c';
+    input.style.boxShadow = '0 0 0 4px rgba(225,48,108,0.15)';
+    setTimeout(() => {
+      input.style.borderColor = '';
+      input.style.boxShadow = '';
+    }, 1500);
+  }
+
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Enter key support
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      startDownload(currentPlatform);
+    }
+  });
+</script>
+
+</body>
+</html>
