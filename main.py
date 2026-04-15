@@ -43,8 +43,7 @@ def get_media_info(req: URLRequest):
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
-        # Instagram ke liye cookies zaruri ho sakti hain
-        # "cookiefile": "cookies.txt",
+        "cookiefile": "/etc/secrets/cookies.txt",  # Render Secret File path
     }
 
     try:
@@ -133,6 +132,7 @@ def download_media(url: str, format_id: str = "best"):
         "no_warnings": True,
         "skip_download": True,
         "format": ydl_fmt,
+        "cookiefile": "/etc/secrets/cookies.txt",  # Render Secret File path
     }
 
     try:
