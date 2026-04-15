@@ -2,11 +2,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yt_dlp
-import re
+import shutil
+import os
 
 app = FastAPI(title="SaveIt Downloader API")
 
-# CORS — allow all origins (apna frontend domain daal sakte ho baad mein)
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,6 +17,17 @@ app.add_middleware(
 
 class URLRequest(BaseModel):
     url: str
+
+# Render Secret File read-only hoti hai — /tmp mein copy karo
+COOKIES_SRC = "/etc/secrets/cookies.txt"
+COOKIES_DST = "/tmp/cookies.txt"
+
+def get_cookies_path():
+    """Cookies ko /tmp mein copy karo (writable location)"""
+    if os.path.exists(COOKIES_SRC):
+        shutil.copy2(COOKIES_SRC, COOKIES_DST)
+        return COOKIES_DST
+    return None
 
 def detect_platform(url: str) -> str:
     if "instagram.com" in url:
@@ -32,25 +44,25 @@ def root():
 
 @app.post("/info")
 def get_media_info(req: URLRequest):
-    """Get media info (title, thumbnail, formats) without downloading"""
     url = req.url.strip()
     platform = detect_platform(url)
 
     if platform == "unknown":
         raise HTTPException(status_code=400, detail="Unsupported URL. Only Instagram, YouTube, Facebook supported.")
 
+    cookies = get_cookies_path()
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
-        "cookiefile": "/etc/secrets/cookies.txt",  # Render Secret File path
     }
+    if cookies:
+        ydl_opts["cookiefile"] = cookies
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
-        # Formats clean karke bhejte hain
         formats = []
         seen = set()
 
@@ -73,7 +85,6 @@ def get_media_info(req: URLRequest):
                             "filesize": f.get("filesize"),
                         })
 
-            # Audio only option
             formats.append({
                 "format_id": "bestaudio/best",
                 "label": "Audio Only (MP3)",
@@ -81,15 +92,10 @@ def get_media_info(req: URLRequest):
                 "ext": "mp3",
                 "filesize": None,
             })
-
-            # Height ke hisaab se sort karo
             formats = sorted(formats, key=lambda x: x["height"], reverse=True)
 
-        # Agar formats empty hain toh best format de do
         if not formats:
-            formats = [
-                {"format_id": "best", "label": "Best Quality", "height": 0, "ext": "mp4", "filesize": None},
-            ]
+            formats = [{"format_id": "best", "label": "Best Quality", "height": 0, "ext": "mp4", "filesize": None}]
 
         return {
             "platform": platform,
@@ -111,35 +117,31 @@ def get_media_info(req: URLRequest):
 
 @app.get("/download")
 def download_media(url: str, format_id: str = "best"):
-    """
-    Returns a direct download URL for the requested format.
-    yt-dlp se direct stream URL nikalta hai.
-    """
     url = url.strip()
     platform = detect_platform(url)
 
     if platform == "unknown":
         raise HTTPException(status_code=400, detail="Unsupported URL.")
 
-    # Audio only case
     if format_id == "bestaudio/best" or format_id == "audio":
         ydl_fmt = "bestaudio/best"
     else:
         ydl_fmt = f"{format_id}+bestaudio/{format_id}/best"
 
+    cookies = get_cookies_path()
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
         "format": ydl_fmt,
-        "cookiefile": "/etc/secrets/cookies.txt",  # Render Secret File path
     }
+    if cookies:
+        ydl_opts["cookiefile"] = cookies
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
-        # Direct stream URL
         direct_url = info.get("url") or (info.get("formats", [{}])[-1].get("url"))
 
         if not direct_url:
