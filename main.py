@@ -7,7 +7,6 @@ import os
 
 app = FastAPI(title="SaveIt Downloader API")
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,12 +17,10 @@ app.add_middleware(
 class URLRequest(BaseModel):
     url: str
 
-# Render Secret File read-only hoti hai — /tmp mein copy karo
 COOKIES_SRC = "/etc/secrets/cookies.txt"
 COOKIES_DST = "/tmp/cookies.txt"
 
 def get_cookies_path():
-    """Cookies ko /tmp mein copy karo (writable location)"""
     if os.path.exists(COOKIES_SRC):
         shutil.copy2(COOKIES_SRC, COOKIES_DST)
         return COOKIES_DST
@@ -38,9 +35,34 @@ def detect_platform(url: str) -> str:
         return "facebook"
     return "unknown"
 
+def get_ydl_opts(extra: dict = {}):
+    cookies = get_cookies_path()
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        # Android client use karo — bot detection bypass
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android"],
+                "player_skip": ["webpage", "configs"],
+            }
+        },
+        "http_headers": {
+            "User-Agent": "com.google.android.youtube/17.36.4 (Linux; U; Android 12; GB) gzip",
+        },
+    }
+    if cookies:
+        opts["cookiefile"] = cookies
+    opts.update(extra)
+    return opts
+
 @app.get("/")
 def root():
-    return {"status": "SaveIt API is running 🚀"}
+    return {
+        "status": "SaveIt API is running 🚀",
+        "cookies_found": os.path.exists(COOKIES_SRC)
+    }
 
 @app.post("/info")
 def get_media_info(req: URLRequest):
@@ -48,20 +70,9 @@ def get_media_info(req: URLRequest):
     platform = detect_platform(url)
 
     if platform == "unknown":
-        raise HTTPException(
-            status_code=400,
-            detail="Unsupported URL. Only Instagram, YouTube, Facebook supported."
-        )
+        raise HTTPException(status_code=400, detail="Unsupported URL.")
 
-    cookies = get_cookies_path()
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-        "noplaylist": True,
-    }
-    if cookies:
-        ydl_opts["cookiefile"] = cookies
+    ydl_opts = get_ydl_opts()
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -75,9 +86,9 @@ def get_media_info(req: URLRequest):
                 height = f.get("height")
                 ext = f.get("ext", "mp4")
                 has_video = f.get("vcodec", "none") != "none"
+                has_audio = f.get("acodec", "none") != "none"
 
-                # Sirf video hona enough hai; YouTube me audio alag stream me hoti hai
-                if has_video and height:
+                if has_video and has_audio and height:
                     label = f"{height}p {ext.upper()}"
                     if label not in seen:
                         seen.add(label)
@@ -89,27 +100,17 @@ def get_media_info(req: URLRequest):
                             "filesize": f.get("filesize"),
                         })
 
-            # Audio option
             formats.append({
                 "format_id": "bestaudio/best",
-                "label": "Audio Only",
+                "label": "Audio Only (MP3)",
                 "height": 0,
-                "ext": "m4a",
+                "ext": "mp3",
                 "filesize": None,
             })
-
             formats = sorted(formats, key=lambda x: x["height"], reverse=True)
 
         if not formats:
-            formats = [
-                {
-                    "format_id": "best",
-                    "label": "Best Quality",
-                    "height": 0,
-                    "ext": "mp4",
-                    "filesize": None,
-                }
-            ]
+            formats = [{"format_id": "best", "label": "Best Quality", "height": 0, "ext": "mp4", "filesize": None}]
 
         return {
             "platform": platform,
@@ -122,13 +123,10 @@ def get_media_info(req: URLRequest):
 
     except yt_dlp.utils.DownloadError as e:
         error_msg = str(e)
-        if "Private" in error_msg or "login" in error_msg.lower():
-            raise HTTPException(status_code=403, detail="Private content — login required.")
-        if "confirm you’re not a bot" in error_msg.lower() or "confirm you're not a bot" in error_msg.lower():
-            raise HTTPException(status_code=403, detail="YouTube is asking for login/cookies verification.")
-        raise HTTPException(status_code=422, detail=f"Could not fetch media: {error_msg[:200]}")
+        raise HTTPException(status_code=422, detail=f"Could not fetch media: {error_msg[:300]}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)[:200])
+        raise HTTPException(status_code=500, detail=str(e)[:300])
+
 
 @app.get("/download")
 def download_media(url: str, format_id: str = "best"):
@@ -138,42 +136,18 @@ def download_media(url: str, format_id: str = "best"):
     if platform == "unknown":
         raise HTTPException(status_code=400, detail="Unsupported URL.")
 
-    # Safer format handling
-    if format_id in ("bestaudio/best", "audio"):
+    if format_id == "bestaudio/best" or format_id == "audio":
         ydl_fmt = "bestaudio/best"
-    elif format_id == "best":
-        ydl_fmt = "bestvideo*+bestaudio/best"
     else:
-        ydl_fmt = f"{format_id}+bestaudio/best/{format_id}/best"
+        ydl_fmt = f"{format_id}+bestaudio/{format_id}/best"
 
-    cookies = get_cookies_path()
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-        "noplaylist": True,
-        "format": ydl_fmt,
-    }
-    if cookies:
-        ydl_opts["cookiefile"] = cookies
+    ydl_opts = get_ydl_opts({"format": ydl_fmt})
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
-        direct_url = info.get("url")
-
-        if not direct_url and info.get("requested_formats"):
-            for f in info["requested_formats"]:
-                if f.get("url"):
-                    direct_url = f["url"]
-                    break
-
-        if not direct_url and info.get("formats"):
-            for f in reversed(info["formats"]):
-                if f.get("url"):
-                    direct_url = f["url"]
-                    break
+        direct_url = info.get("url") or (info.get("formats", [{}])[-1].get("url"))
 
         if not direct_url:
             raise HTTPException(status_code=404, detail="Could not get download URL.")
@@ -186,9 +160,6 @@ def download_media(url: str, format_id: str = "best"):
         }
 
     except yt_dlp.utils.DownloadError as e:
-        error_msg = str(e)
-        if "confirm you’re not a bot" in error_msg.lower() or "confirm you're not a bot" in error_msg.lower():
-            raise HTTPException(status_code=403, detail="YouTube is asking for login/cookies verification.")
-        raise HTTPException(status_code=422, detail=error_msg[:200])
+        raise HTTPException(status_code=422, detail=str(e)[:300])
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)[:200])
+        raise HTTPException(status_code=500, detail=str(e)[:300])
